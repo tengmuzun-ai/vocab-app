@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>単語帳</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2F4370">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F3F5F6;
+    --surface: #FFFFFF;
+    --ink: #1B2430;
+    --ink-soft: #5C6B7A;
+    --accent: #2F4370;
+    --known: #6B8F71;
+    --unknown: #C4634F;
+    --border: #DDE3E8;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Noto Sans JP', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  header {
+    padding: 28px 20px 16px;
+    text-align: left;
+  }
+  h1 {
+    font-family: 'Noto Serif JP', serif;
+    font-weight: 700;
+    font-size: 28px;
+    margin: 0;
+    color: var(--ink);
+  }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    padding: 0 20px 16px;
+  }
+  .tab {
+    flex: 1;
+    padding: 10px 0;
+    text-align: center;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--ink-soft);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  main {
+    padding: 0 20px 40px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* --- List view --- */
+  .word-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .word-item .word {
+    font-family: 'Noto Serif JP', serif;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .word-item .reading {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-left: 6px;
+  }
+  .word-item .meaning {
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin-top: 4px;
+  }
+  .empty {
+    text-align: center;
+    color: var(--ink-soft);
+    padding: 60px 20px;
+    font-size: 14px;
+    line-height: 1.8;
+  }
+
+  /* --- Review (flashcard) view --- */
+  .card-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 20px;
+  }
+  .card {
+    width: 100%;
+    max-width: 340px;
+    aspect-ratio: 3 / 4;
+    perspective: 1200px;
+  }
+  .card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform-style: preserve-3d;
+    cursor: pointer;
+  }
+  .card-inner.flipped { transform: rotateY(180deg); }
+  .card-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+  }
+  .card-face.back { transform: rotateY(180deg); }
+  .card-face .label {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+  }
+  .card-face .word {
+    font-family: 'Noto Serif JP', serif;
+    font-size: 34px;
+    font-weight: 700;
+  }
+  .card-face .reading {
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin-top: 8px;
+  }
+  .card-face .meaning {
+    font-size: 18px;
+    line-height: 1.7;
+  }
+  .review-controls {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    width: 100%;
+    max-width: 340px;
+  }
+  .review-controls button {
+    flex: 1;
+    padding: 14px 0;
+    border-radius: 10px;
+    border: none;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+  }
+  .btn-unknown { background: var(--unknown); }
+  .btn-known { background: var(--known); }
+  .progress {
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 13px;
+    margin-top: 16px;
+  }
+</style>
+</head>
+<body>
+
+<header><h1>単語帳</h1></header>
+
+<div class="tabs">
+  <button class="tab active" data-view="list">一覧</button>
+  <button class="tab" data-view="review">復習</button>
+</div>
+
+<main>
+  <section id="view-list" class="view active">
+    <div id="list-container"></div>
+  </section>
+
+  <section id="view-review" class="view">
+    <div id="review-container" class="card-stage"></div>
+  </section>
+</main>
+
+<script>
+const API = '/api/words';
+const REVIEW_API = '/api/review';
+
+let words = [];
+let queue = [];
+let currentIndex = 0;
+
+async function loadWords() {
+  const res = await fetch(API);
+  const data = await res.json();
+  words = data.words || [];
+  renderList();
+  buildQueue();
+  renderReview();
+}
+
+function renderList() {
+  const c = document.getElementById('list-container');
+  if (words.length === 0) {
+    c.innerHTML = `<div class="empty">まだ単語が登録されていません。<br>ショートカットから単語を調べると、ここに表示されます。</div>`;
+    return;
+  }
+  c.innerHTML = words.map(w => `
+    <div class="word-item">
+      <span class="word">${escapeHtml(w.word)}</span>
+      ${w.reading ? `<span class="reading">${escapeHtml(w.reading)}</span>` : ''}
+      <div class="meaning">${escapeHtml(w.meaning)}</div>
+    </div>
+  `).join('');
+}
+
+function buildQueue() {
+  const now = new Date();
+  queue = words.filter(w => !w.next_review || new Date(w.next_review) <= now);
+  currentIndex = 0;
+}
+
+function renderReview() {
+  const c = document.getElementById('review-container');
+  if (queue.length === 0) {
+    c.innerHTML = `<div class="empty">今日復習する単語はありません。</div>`;
+    return;
+  }
+  if (currentIndex >= queue.length) {
+    c.innerHTML = `<div class="empty">この回の復習は終了しました。</div>`;
+    return;
+  }
+  const w = queue[currentIndex];
+  c.innerHTML = `
+    <div class="card">
+      <div class="card-inner" id="card-inner">
+        <div class="card-face front">
+          <div class="label">タップして意味を表示</div>
+          <div class="word">${escapeHtml(w.word)}</div>
+          ${w.reading ? `<div class="reading">${escapeHtml(w.reading)}</div>` : ''}
+        </div>
+        <div class="card-face back">
+          <div class="label">意味</div>
+          <div class="meaning">${escapeHtml(w.meaning)}</div>
+        </div>
+      </div>
+    </div>
+    <div class="review-controls">
+      <button class="btn-unknown" id="btn-unknown">わからない</button>
+      <button class="btn-known" id="btn-known">覚えた</button>
+    </div>
+    <div class="progress">${currentIndex + 1} / ${queue.length}</div>
+  `;
+
+  document.getElementById('card-inner').addEventListener('click', function() {
+    this.classList.toggle('flipped');
+  });
+  document.getElementById('btn-known').addEventListener('click', () => submitReview(w.id, true));
+  document.getElementById('btn-unknown').addEventListener('click', () => submitReview(w.id, false));
+}
+
+async function submitReview(id, known) {
+  try {
+    await fetch(REVIEW_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, known })
+    });
+  } catch (e) {
+    console.error('review update failed', e);
+  }
+  currentIndex += 1;
+  renderReview();
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('view-' + tab.dataset.view).classList.add('active');
+    if (tab.dataset.view === 'review') {
+      buildQueue();
+      renderReview();
+    }
+  });
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+loadWords();
+</script>
+</body>
+</html>
