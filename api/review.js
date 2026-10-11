@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
-  const { data: userData } = token ? await supabase.auth.getUser(token) : { data: {} };
-  if (!userData?.user) return res.status(401).json({ error: 'ログインが必要です' });
+  if (!token) return res.status(401).json({ error: 'ログインが必要です' });
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, { global: { headers: { Authorization: `Bearer ${token}` } } });
+  const { data: userData, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !userData?.user) return res.status(401).json({ error: 'ログインが必要です' });
   const { id, known } = req.body || {};
   if (!id) return res.status(400).json({ error: 'id is required' });
   const { data: current, error: fetchErr } = await supabase.from('words').select('review_count, ease_factor').eq('id', id).eq('user_id', userData.user.id).single();
